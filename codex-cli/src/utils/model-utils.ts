@@ -12,7 +12,6 @@ export const RECOMMENDED_MODELS: Array<string> = ["o4-mini", "o3"];
  * lifetime of the process and the results are cached for subsequent calls.
  */
 
-
 async function fetchModels(provider: string): Promise<Array<string>> {
   // If the user has not configured an API key we cannot hit the network.
   if (!getApiKey(provider)) {
@@ -36,7 +35,9 @@ async function fetchModels(provider: string): Promise<Array<string>> {
   }
 }
 
-export async function getAvailableModels(provider: string): Promise<Array<string>> {
+export async function getAvailableModels(
+  provider: string,
+): Promise<Array<string>> {
   return fetchModels(provider.toLowerCase());
 }
 
