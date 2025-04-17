@@ -65,7 +65,8 @@ const TerminalHeader: React.FC<TerminalHeaderProps> = ({
               <Text color="blueBright">↳</Text> model: <Text bold>{model}</Text>
             </Text>
             <Text dimColor>
-              <Text color="blueBright">↳</Text> provider: <Text bold>{provider}</Text>
+              <Text color="blueBright">↳</Text> provider:{" "}
+              <Text bold>{provider}</Text>
             </Text>
             <Text dimColor>
               <Text color="blueBright">↳</Text> approval:{" "}

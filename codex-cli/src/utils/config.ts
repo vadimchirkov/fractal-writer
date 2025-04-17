@@ -357,7 +357,6 @@ export const saveConfig = (
       : CONFIG_YML_FILEPATH;
   }
 
-
   const dir = dirname(targetPath);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -365,11 +364,19 @@ export const saveConfig = (
 
   const ext = extname(targetPath).toLowerCase();
   if (ext === ".yaml" || ext === ".yml") {
-    writeFileSync(targetPath, dumpYaml({ model: config.model, provider: config.provider }), "utf-8");
+    writeFileSync(
+      targetPath,
+      dumpYaml({ model: config.model, provider: config.provider }),
+      "utf-8",
+    );
   } else {
     writeFileSync(
       targetPath,
-      JSON.stringify({ model: config.model, provider: config.provider }, null, 2),
+      JSON.stringify(
+        { model: config.model, provider: config.provider },
+        null,
+        2,
+      ),
       "utf-8",
     );
   }

@@ -35,9 +35,9 @@ export default function ModelOverlay({
   const [items, setItems] = useState<Array<{ label: string; value: string }>>(
     [],
   );
-  const [providerItems, setProviderItems] = useState<Array<{ label: string; value: string }>>(
-    Object.values(providers).map((p) => ({ label: p.name, value: p.name }))
-  );
+  const [providerItems, setProviderItems] = useState<
+    Array<{ label: string; value: string }>
+  >(Object.values(providers).map((p) => ({ label: p.name, value: p.name })));
   const [mode, setMode] = useState<"model" | "provider">("model");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -52,7 +52,7 @@ export default function ModelOverlay({
           models.map((m) => ({
             label: m,
             value: m,
-          }))
+          })),
         );
       } catch (error) {
         console.error("Error loading models:", error);
@@ -114,7 +114,8 @@ export default function ModelOverlay({
         description={
           <Box flexDirection="column">
             <Text>
-              Current provider: <Text color="greenBright">{currentProvider}</Text>
+              Current provider:{" "}
+              <Text color="greenBright">{currentProvider}</Text>
             </Text>
             <Text dimColor>press tab to switch to model selection</Text>
           </Box>

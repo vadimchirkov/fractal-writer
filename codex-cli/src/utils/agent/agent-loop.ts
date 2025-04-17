@@ -9,7 +9,12 @@ import type {
 import type { Reasoning } from "openai/resources.mjs";
 
 import { log, isLoggingEnabled } from "./log.js";
-import { OPENAI_BASE_URL, OPENAI_TIMEOUT_MS, getApiKey, getBaseUrl } from "../config.js";
+import {
+  OPENAI_BASE_URL,
+  OPENAI_TIMEOUT_MS,
+  getApiKey,
+  getBaseUrl,
+} from "../config.js";
 import { parseToolCallArguments } from "../parsers.js";
 import {
   ORIGIN,
@@ -507,7 +512,7 @@ export class AgentLoop {
                 `instructions (length ${mergedInstructions.length}): ${mergedInstructions}`,
               );
             }
-            
+
             // eslint-disable-next-line no-await-in-loop
             stream = await responsesCreateViaChatCompletions(this.oai, {
               model: this.model,

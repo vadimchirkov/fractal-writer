@@ -403,7 +403,7 @@ export default function TerminalChat({
               const updatedConfig = {
                 ...config,
                 provider: newProvider,
-                model: defaultModel
+                model: defaultModel,
               };
               saveConfig(updatedConfig);
 

@@ -17,7 +17,8 @@ import { AgentLoop } from "./utils/agent/agent-loop";
 import { initLogger } from "./utils/agent/log";
 import { ReviewDecision } from "./utils/agent/review";
 import { AutoApprovalMode } from "./utils/auto-approval-mode";
-import { getApiKey,
+import {
+  getApiKey,
   loadConfig,
   PRETTY_PRINT,
   INSTRUCTIONS_FILEPATH,
@@ -205,7 +206,6 @@ if (cli.flags.config) {
 // API key handling
 // ---------------------------------------------------------------------------
 
-
 const fullContextMode = Boolean(cli.flags.fullContext);
 let config = loadConfig(undefined, undefined, {
   cwd: process.cwd(),
@@ -325,8 +325,6 @@ const approvalPolicy: ApprovalPolicy =
     : cli.flags.autoEdit || cli.flags.approvalMode === "auto-edit"
     ? AutoApprovalMode.AUTO_EDIT
     : AutoApprovalMode.SUGGEST;
-
-
 
 const instance = render(
   <App
