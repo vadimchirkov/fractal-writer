@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { load as loadYaml, dump as dumpYaml } from "js-yaml";
 import { homedir } from "os";
 import { dirname, join, extname, resolve as resolvePath } from "path";
+import { providers } from "./providers.js";
 
 export const DEFAULT_AGENTIC_MODEL = "o4-mini";
 export const DEFAULT_FULL_CONTEXT_MODEL = "gpt-4.1";
@@ -40,12 +41,30 @@ export function setApiKey(apiKey: string): void {
   OPENAI_API_KEY = apiKey;
 }
 
+export function getBaseUrl(provider: string = "openai"): string | undefined {
+  const providerInfo = providers[provider.toLowerCase()];
+  if (providerInfo) {
+    return providerInfo.baseURL;
+  }
+  return undefined;
+}
+
+export function getApiKey(provider: string = "openai"): string | undefined {
+  const providerInfo = providers[provider.toLowerCase()];
+  if (providerInfo) {
+    return process.env[providerInfo.envKey];
+  }
+
+  return undefined;
+}
+
 // Formatting (quiet mode-only).
 export const PRETTY_PRINT = Boolean(process.env["PRETTY_PRINT"] || "");
 
 // Represents config as persisted in config.json.
 export type StoredConfig = {
   model?: string;
+  provider?: string;
   approvalMode?: AutoApprovalMode;
   fullAutoErrorMode?: FullAutoErrorMode;
   memory?: MemoryConfig;
@@ -74,6 +93,7 @@ export type MemoryConfig = {
 export type AppConfig = {
   apiKey?: string;
   model: string;
+  provider?: string;
   instructions: string;
   fullAutoErrorMode?: FullAutoErrorMode;
   memory?: MemoryConfig;
@@ -266,6 +286,7 @@ export const loadConfig = (
       (options.isFullContext
         ? DEFAULT_FULL_CONTEXT_MODEL
         : DEFAULT_AGENTIC_MODEL),
+    provider: storedConfig.provider,
     instructions: combinedInstructions,
     notify: storedConfig.notify === true,
   };
@@ -375,7 +396,7 @@ export const saveConfig = (
   const ext = extname(targetPath).toLowerCase();
   // Create the config object to save
   const configToSave: StoredConfig = {
-    model: config.model,
+    model: config.model, provider: config.provider
   };
 
   // Add history settings if they exist
