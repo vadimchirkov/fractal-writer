@@ -1,0 +1,19 @@
+{
+  "name": "tauri-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "build:all": "cd ../frontend && npm run build && cd ../tauri-app && npm run tauri build",
+    "dev:all": "concurrently \"cd ../frontend && npm run dev\" \"npm run tauri dev\"",
+    "test:all": "cd ../frontend && npm test || true && cd ../tauri-app && npm test || true"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-shell": "^2.2.1",
+    "concurrently": "^9.1.2"
+  }
+}
