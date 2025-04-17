@@ -62,26 +62,23 @@ export default function HelpOverlay({
           <Text color="yellow">Ctrl+J</Text> – insert newline
         </Text>
         {/* Re-enable once we re-enable new input */}
-        {/*
-        <Text>
-          <Text color="yellow">Ctrl+X</Text>/<Text color="yellow">Ctrl+E</Text>
-          &nbsp;– open external editor ($EDITOR)
-        </Text>
-        */}
-        <Text>
-          <Text color="yellow">Up/Down</Text> – scroll prompt history
-        </Text>
-        <Text>
-          <Text color="yellow">
-            Esc<Text dimColor>(✕2)</Text>
-          </Text>{" "}
-          – interrupt current action
-        </Text>
-        <Text>
-          <Text color="yellow">Ctrl+C</Text> – quit Codex
-        </Text>
       </Box>
 
+      <Box paddingX={1} marginTop={1}>
+        <Text bold color="cyan">Writing Assistant Commands</Text>
+      </Box>
+      <Box paddingX={1}>
+        <Text>/outline &mdash; Outline your idea or text</Text>
+      </Box>
+      <Box paddingX={1}>
+        <Text>/summarize &mdash; Summarize the provided text</Text>
+      </Box>
+      <Box paddingX={1}>
+        <Text>/rewrite &mdash; Rewrite text in a different style or tone</Text>
+      </Box>
+      <Box paddingX={1}>
+        <Text>/brainstorm &mdash; Generate ideas for a topic</Text>
+      </Box>
       <Box paddingX={1}>
         <Text dimColor>esc or q to close</Text>
       </Box>

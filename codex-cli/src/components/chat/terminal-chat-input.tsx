@@ -17,9 +17,11 @@ import React, { useCallback, useState, Fragment } from "react";
 import { useInterval } from "use-interval";
 
 const suggestions = [
-  "explain this codebase to me",
-  "fix any build errors",
-  "are there any bugs in my code?",
+  "Write a poem about spring",
+  "Summarize this article",
+  "Draft a blog post about AI",
+  "Outline a story about space exploration",
+  "Rewrite this paragraph in a formal tone"
 ];
 
 export default function TerminalChatInput({
@@ -145,6 +147,52 @@ export default function TerminalChatInput({
       if (inputValue === "/help") {
         setInput("");
         openHelpOverlay();
+        return;
+      }
+
+      // Writing-specific slash commands
+      if (inputValue.startsWith("/outline")) {
+        (async () => {
+          setInput("");
+          const item = await createInputItem(
+            "Please outline the following text or idea: " + inputValue.replace("/outline", "").trim(),
+            []
+          );
+          submitInput([item]);
+        })();
+        return;
+      }
+      if (inputValue.startsWith("/summarize")) {
+        (async () => {
+          setInput("");
+          const item = await createInputItem(
+            "Please summarize the following text: " + inputValue.replace("/summarize", "").trim(),
+            []
+          );
+          submitInput([item]);
+        })();
+        return;
+      }
+      if (inputValue.startsWith("/rewrite")) {
+        (async () => {
+          setInput("");
+          const item = await createInputItem(
+            "Please rewrite the following text: " + inputValue.replace("/rewrite", "").trim(),
+            []
+          );
+          submitInput([item]);
+        })();
+        return;
+      }
+      if (inputValue.startsWith("/brainstorm")) {
+        (async () => {
+          setInput("");
+          const item = await createInputItem(
+            "Please brainstorm ideas for: " + inputValue.replace("/brainstorm", "").trim(),
+            []
+          );
+          submitInput([item]);
+        })();
         return;
       }
 
