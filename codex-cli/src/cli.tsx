@@ -252,7 +252,10 @@ config = {
   model,
 };
 
-if (!(await isModelSupportedForResponses(config.model)) && (!provider || provider.toLowerCase() === "openai")) {
+if (
+  !(await isModelSupportedForResponses(config.model)) &&
+  (!provider || provider.toLowerCase() === "openai")
+) {
   // eslint-disable-next-line no-console
   console.error(
     `The model "${config.model}" does not appear in the list of models ` +
