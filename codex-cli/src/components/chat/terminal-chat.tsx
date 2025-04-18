@@ -18,7 +18,7 @@ import { AgentLoop } from "../../utils/agent/agent-loop.js";
 import { isLoggingEnabled, log } from "../../utils/agent/log.js";
 import { ReviewDecision } from "../../utils/agent/review.js";
 import { generateCompactSummary } from "../../utils/compact-summary.js";
-import { OPENAI_BASE_URL } from "../../utils/config.js";
+import { OPENAI_BASE_URL , saveConfig } from "../../utils/config.js";
 import { createInputItem } from "../../utils/input-utils.js";
 import { getAvailableModels } from "../../utils/model-utils.js";
 import { CLI_VERSION } from "../../utils/session.js";
@@ -33,7 +33,6 @@ import { exec } from "node:child_process";
 import OpenAI from "openai";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { inspect } from "util";
-import { saveConfig } from "../../utils/config.js";
 
 type Props = {
   config: AppConfig;

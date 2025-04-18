@@ -11,12 +11,12 @@ import type { Reasoning } from "openai/resources.mjs";
 
 import { log, isLoggingEnabled } from "./log.js";
 import {
-  OPENAI_BASE_URL,
   OPENAI_TIMEOUT_MS,
   getApiKey,
   getBaseUrl,
 } from "../config.js";
 import { parseToolCallArguments } from "../parsers.js";
+import { responsesCreateViaChatCompletions } from "../responses.js";
 import {
   ORIGIN,
   CLI_VERSION,
@@ -27,7 +27,6 @@ import {
 import { handleExecCommand } from "./handle-exec-command.js";
 import { randomUUID } from "node:crypto";
 import OpenAI, { APIConnectionTimeoutError } from "openai";
-import { responsesCreateViaChatCompletions } from "../responses.js";
 
 // Wait time before retrying after rate limit errors (ms).
 const RATE_LIMIT_RETRY_WAIT_MS = parseInt(

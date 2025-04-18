@@ -53,16 +53,31 @@ type ResponseOutput = Response;
 //   metadata: Record<string, string>;
 // }
 
+// Define types for the ResponseItem content and parts 
+type ResponseContentPart = {
+  type: string;
+  [key: string]: unknown;
+};
+
+type ResponseItemType = {
+  type: string;
+  id?: string;
+  status?: string;
+  role?: string;
+  content?: Array<ResponseContentPart>;
+  [key: string]: unknown;
+};
+
 type ResponseEvent =
   | { type: "response.created"; response: Partial<ResponseOutput> }
   | { type: "response.in_progress"; response: Partial<ResponseOutput> }
-  | { type: "response.output_item.added"; output_index: number; item: any }
+  | { type: "response.output_item.added"; output_index: number; item: ResponseItemType }
   | {
       type: "response.content_part.added";
       item_id: string;
       output_index: number;
       content_index: number;
-      part: any;
+      part: ResponseContentPart;
     }
   | {
       type: "response.output_text.delta";
@@ -97,18 +112,49 @@ type ResponseEvent =
       item_id: string;
       output_index: number;
       content_index: number;
-      part: any;
+      part: ResponseContentPart;
     }
-  | { type: "response.output_item.done"; output_index: number; item: any }
+  | { type: "response.output_item.done"; output_index: number; item: ResponseItemType }
   | { type: "response.completed"; response: ResponseOutput }
   | { type: "error"; code: string; message: string; param: string | null };
+
+// Define a type for tool call data
+type ToolCallData = {
+  id: string;
+  name: string;
+  arguments: string;
+};
+
+// Define a type for usage data
+type UsageData = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  [key: string]: unknown;
+};
+
+// Define a type for content output
+type ResponseContentOutput = 
+  | {
+      type: "function_call";
+      call_id: string;
+      name: string;
+      arguments: string;
+      [key: string]: unknown;
+    }
+  | {
+      type: "output_text";
+      text: string;
+      annotations: Array<unknown>;
+      [key: string]: unknown;
+    };
 
 // Global map to store conversation histories
 const conversationHistories = new Map<
   string,
   {
     previous_response_id: string | null;
-    messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+    messages: Array<OpenAI.Chat.Completions.ChatCompletionMessageParam>;
   }
 >();
 
@@ -121,8 +167,14 @@ function generateId(prefix: string = "msg"): string {
 type ResponseInputItem = ResponseCreateInput["input"][number];
 
 function convertInputItemToMessage(
-  item: ResponseInputItem,
+  item: string | ResponseInputItem,
 ): OpenAI.Chat.Completions.ChatCompletionMessageParam {
+  // Handle string inputs as content for a user message
+  if (typeof item === 'string') {
+    return { role: 'user', content: item };
+  }
+
+  // Handle object items
   if (item.type === "message") {
     const content = item.content
       .filter((c) => c.type === "input_text")
@@ -136,23 +188,28 @@ function convertInputItemToMessage(
       content: item.output,
     };
   }
-  throw new Error(`Unsupported input item type: ${item.type}`);
+  throw new Error(`Unsupported input item type: ${(item as ResponseInputItem).type}`);
 }
 
 // Function to get full messages including history
 function getFullMessages(
   input: ResponseCreateInput,
-): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
-  let baseHistory: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+): Array<OpenAI.Chat.Completions.ChatCompletionMessageParam> {
+  let baseHistory: Array<OpenAI.Chat.Completions.ChatCompletionMessageParam> = [];
   if (input.previous_response_id) {
     const prev = conversationHistories.get(input.previous_response_id);
     if (!prev)
-      throw new Error(
+      {throw new Error(
         `Previous response not found: ${input.previous_response_id}`,
-      );
+      );}
     baseHistory = prev.messages;
   }
-  const newInputMessages = input.input.map(convertInputItemToMessage);
+  
+  // Handle both string and ResponseInputItem in input.input
+  const newInputMessages = Array.isArray(input.input) 
+    ? input.input.map(convertInputItemToMessage) 
+    : [convertInputItemToMessage(input.input)];
+    
   const messages = [...baseHistory, ...newInputMessages];
   if (
     input.instructions &&
@@ -167,7 +224,7 @@ function getFullMessages(
 // Function to convert tools
 function convertTools(
   tools?: ResponseCreateInput["tools"],
-): OpenAI.Chat.Completions.ChatCompletionTool[] | undefined {
+): Array<OpenAI.Chat.Completions.ChatCompletionTool> | undefined {
   return tools
     ?.filter((tool) => tool.type === "function")
     .map((tool) => ({
@@ -238,7 +295,7 @@ async function nonStreamResponses(
     // Construct ResponseOutput
     const responseId = generateId("resp");
     const outputItemId = generateId("msg");
-    const outputContent: Array<any> = [];
+    const outputContent: Array<ResponseContentOutput> = [];
 
     // Check if the response contains tool calls
     const hasFunctionCalls =
@@ -310,7 +367,7 @@ async function nonStreamResponses(
 
     // Add required_action property for tool calls
     if (hasFunctionCalls) {
-      (responseOutput as any).required_action = {
+      (responseOutput as Partial<ResponseOutput>).required_action = {
         type: "submit_tool_outputs",
         submit_tool_outputs: {
           tool_calls: assistantMessage.tool_calls.map((toolCall) => ({
@@ -333,8 +390,9 @@ async function nonStreamResponses(
     });
 
     return responseOutput;
-  } catch (error: any) {
-    throw new Error(`Failed to process chat completion: ${error.message}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to process chat completion: ${errorMessage}`);
   }
 }
 
@@ -373,12 +431,9 @@ async function* streamResponses(
     const outputItemId = generateId("msg");
     let textContentAdded = false;
     let textContent = "";
-    const toolCalls = new Map<
-      number,
-      { id: string; name: string; arguments: string }
-    >();
-    let usage: any = null;
-    let finalOutputItem: any = [];
+    const toolCalls = new Map<number, ToolCallData>();
+    let usage: UsageData | null = null;
+    const finalOutputItem: Array<ResponseContentOutput> = [];
     // Initial response
     const initialResponse: Partial<ResponseOutput> = {
       id: responseId,
@@ -411,7 +466,7 @@ async function* streamResponses(
     for await (const chunk of stream) {
       // console.error('\nCHUNK: ', JSON.stringify(chunk));
       const choice = chunk.choices[0];
-      if (!choice) continue;
+      if (!choice) {continue;}
       if (
         !isToolCall &&
         (("tool_calls" in choice.delta && choice.delta.tool_calls) ||
@@ -594,11 +649,11 @@ async function* streamResponses(
 
       yield { type: "response.completed", response: finalResponse };
     }
-  } catch (error: any) {
+  } catch (error) {
     yield {
       type: "error",
-      code: error.code || "unknown",
-      message: error.message,
+      code: error instanceof Error && "code" in error ? (error as { code: string }).code : "unknown",
+      message: error instanceof Error ? error.message : String(error),
       param: null,
     };
   }

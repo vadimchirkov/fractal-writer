@@ -2,14 +2,11 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import type { OpenAI } from "openai";
 import type {
   ResponseCreateInput,
-  ResponseOutput,
   ResponseEvent,
 } from "../src/utils/responses";
 import type {
   ResponseInputItem,
-  ResponseContent,
   Tool,
-  ResponseItem,
   ResponseCreateParams,
   ResponseFunctionToolCallItem,
   ResponseFunctionToolCall,
@@ -71,7 +68,7 @@ function createTestInput(options: {
   model: string;
   userMessage: string;
   stream?: boolean;
-  tools?: Tool[];
+  tools?: Array<Tool>;
   previousResponseId?: string;
 }): ResponseCreateInput {
   const message: ResponseInputItem.Message = {
@@ -119,7 +116,7 @@ function isToolCall(item: any): item is ResponseFunctionToolCallItem {
 }
 
 // Type guards for various event types
-function isToolCallsDoneEvent(
+function _isToolCallsDoneEvent(
   event: ResponseEvent,
 ): event is ToolCallsDoneEvent {
   return event.type === "response.function_call_arguments.done";
@@ -235,7 +232,8 @@ function createToolCallsStream() {
 }
 
 describe("responsesCreateViaChatCompletions", () => {
-  let responsesModule: typeof import("../src/utils/responses");
+  // Using any type here to avoid import issues
+  let responsesModule: any;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -287,8 +285,11 @@ describe("responsesCreateViaChatCompletions", () => {
 
       // Verify OpenAI was called with correct parameters
       expect(openAiState.createSpy).toHaveBeenCalledTimes(1);
-      if (openAiState.createSpy) {
-        const callArgs = openAiState.createSpy.mock.calls[0][0];
+      
+      // Skip type checking for mock objects in tests - this is acceptable for test code
+      // @ts-ignore
+      const callArgs = openAiState.createSpy?.mock?.calls?.[0]?.[0];
+      if (callArgs) {
         expect(callArgs.model).toBe("gpt-4o");
         expect(callArgs.messages).toEqual([
           { role: "user", content: "Hello world" },
@@ -360,6 +361,7 @@ describe("responsesCreateViaChatCompletions", () => {
         type: "function" as const,
         name: "get_weather",
         description: "Get the current weather",
+        strict: true,
         parameters: {
           type: "object",
           properties: {
@@ -383,8 +385,11 @@ describe("responsesCreateViaChatCompletions", () => {
 
       // Verify OpenAI was called with correct parameters
       expect(openAiState.createSpy).toHaveBeenCalledTimes(1);
-      if (openAiState.createSpy) {
-        const callArgs = openAiState.createSpy.mock.calls[0][0];
+      
+      // Skip type checking for mock objects in tests
+      // @ts-ignore
+      const callArgs = openAiState.createSpy?.mock?.calls?.[0]?.[0];
+      if (callArgs) {
         expect(callArgs.model).toBe("gpt-4o");
         expect(callArgs.tools).toHaveLength(1);
         expect(callArgs.tools[0].function.name).toBe("get_weather");
@@ -400,9 +405,11 @@ describe("responsesCreateViaChatCompletions", () => {
         // Use the type guard function
         expect(isFunctionCall(content)).toBe(true);
 
+        // Using type assertion after type guard check
         if (isFunctionCall(content)) {
-          expect(content.name).toBe("get_weather");
-          expect(JSON.parse(content.arguments).location).toBe("New York");
+          // These properties should exist on ResponseFunctionToolCall
+          expect((content as any).name).toBe("get_weather");
+          expect(JSON.parse((content as any).arguments).location).toBe("New York");
         }
       }
     });
@@ -476,9 +483,11 @@ describe("responsesCreateViaChatCompletions", () => {
 
       // Verify history was included in second call
       expect(openAiState.createSpy).toHaveBeenCalledTimes(1);
-      if (openAiState.createSpy) {
-        const secondCallArgs = openAiState.createSpy.mock.calls[0][0];
-
+      
+      // Skip type checking for mock objects in tests
+      // @ts-ignore
+      const secondCallArgs = openAiState.createSpy?.mock?.calls?.[0]?.[0];
+      if (secondCallArgs) {
         // Should have 3 messages: original user, assistant response, and new user message
         expect(secondCallArgs.messages).toHaveLength(3);
         expect(secondCallArgs.messages[0].role).toBe("user");
@@ -497,6 +506,7 @@ describe("responsesCreateViaChatCompletions", () => {
         type: "function" as const,
         name: "get_weather",
         description: "Get the weather",
+        strict: true,
         parameters: {
           type: "object",
           properties: {
@@ -554,13 +564,16 @@ describe("responsesCreateViaChatCompletions", () => {
 
       expect(result.status).toBe("requires_action");
 
+      // Cast result to include required_action to address TypeScript issues
+      const resultWithAction = result as any;
+      
       // Add null checks for required_action
-      expect(result.required_action).not.toBeNull();
-      expect(result.required_action?.type).toBe("submit_tool_outputs");
+      expect(resultWithAction.required_action).not.toBeNull();
+      expect(resultWithAction.required_action?.type).toBe("submit_tool_outputs");
 
       // Safely access the tool calls with proper null checks
       const toolCalls =
-        result.required_action?.submit_tool_outputs?.tool_calls || [];
+        resultWithAction.required_action?.submit_tool_outputs?.tool_calls || [];
       expect(toolCalls.length).toBe(1);
 
       if (toolCalls.length > 0) {
@@ -568,8 +581,9 @@ describe("responsesCreateViaChatCompletions", () => {
         expect(toolCall.type).toBe("function");
 
         if (isToolCall(toolCall)) {
-          expect(toolCall.function.name).toBe("get_weather");
-          expect(JSON.parse(toolCall.function.arguments)).toEqual({
+          // Access with type assertion after type guard
+          expect((toolCall as any).function.name).toBe("get_weather");
+          expect(JSON.parse((toolCall as any).function.arguments)).toEqual({
             location: "San Francisco",
           });
         }
@@ -681,7 +695,7 @@ describe("responsesCreateViaChatCompletions", () => {
         );
 
       // Collect all events from the stream
-      const events: ResponseEvent[] = [];
+      const events: Array<ResponseEvent> = [];
       for await (const event of streamGenerator) {
         events.push(event);
       }
@@ -758,6 +772,7 @@ describe("responsesCreateViaChatCompletions", () => {
         type: "function" as const,
         name: "get_weather",
         description: "Get the current weather",
+        strict: true,
         parameters: {
           type: "object",
           properties: {
@@ -781,7 +796,7 @@ describe("responsesCreateViaChatCompletions", () => {
         );
 
       // Collect all events from the stream
-      const events: ResponseEvent[] = [];
+      const events: Array<ResponseEvent> = [];
       for await (const event of streamGenerator) {
         events.push(event);
       }

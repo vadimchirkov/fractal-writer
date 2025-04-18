@@ -26,7 +26,6 @@ import {
 import { createInputItem } from "./utils/input-utils";
 import {
   isModelSupportedForResponses,
-  preloadModels,
 } from "./utils/model-utils.js";
 import { parseToolCall } from "./utils/parsers";
 import { onExit, setInkRenderer } from "./utils/terminal";
