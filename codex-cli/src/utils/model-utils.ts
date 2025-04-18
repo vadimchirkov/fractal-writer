@@ -59,7 +59,7 @@ export async function isModelSupportedForResponses(
 
   try {
     const models = await Promise.race<Array<string>>([
-      getAvailableModels(),
+      getAvailableModels("openai"),
       new Promise<Array<string>>((resolve) =>
         setTimeout(() => resolve([]), MODEL_LIST_TIMEOUT_MS),
       ),

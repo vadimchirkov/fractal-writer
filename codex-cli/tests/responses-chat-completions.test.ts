@@ -116,7 +116,7 @@ function isToolCall(item: any): item is ResponseFunctionToolCallItem {
 }
 
 // Type guards for various event types
-function _isToolCallsDoneEvent(
+export function _isToolCallsDoneEvent(
   event: ResponseEvent,
 ): event is ToolCallsDoneEvent {
   return event.type === "response.function_call_arguments.done";

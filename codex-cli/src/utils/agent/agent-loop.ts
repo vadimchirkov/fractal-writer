@@ -1,6 +1,7 @@
 import type { ReviewDecision } from "./review.js";
 import type { ApplyPatchCommand, ApprovalPolicy } from "../../approvals.js";
 import type { AppConfig } from "../config.js";
+import type { ResponseEvent } from "../responses.js";
 import type {
   ResponseFunctionToolCall,
   ResponseInputItem,
@@ -751,7 +752,7 @@ export class AgentLoop {
 
         try {
           // eslint-disable-next-line no-await-in-loop
-          for await (const event of stream) {
+          for await (const event of stream as AsyncIterable<ResponseEvent>) {
             // console.error('RESPONSE', JSON.stringify(event));
             if (isLoggingEnabled()) {
               log(`AgentLoop.run(): response event ${event.type}`);

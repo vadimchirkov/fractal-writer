@@ -138,6 +138,10 @@ type UsageData = {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+  input_tokens?: number;
+  input_tokens_details?: { cached_tokens: number };
+  output_tokens?: number;
+  output_tokens_details?: { reasoning_tokens: number };
   [key: string]: unknown;
 };
 
@@ -182,23 +186,30 @@ function convertInputItemToMessage(
     return { role: "user", content: item };
   }
 
-  // Handle object items
-  if (item.type === "message") {
-    const content = item.content
-      .filter((c) => c.type === "input_text")
-      .map((c) => c.text)
-      .join("");
-    return { role: item.role, content };
-  } else if (item.type === "function_call_output") {
+  // At this point we know it's a ResponseInputItem
+  const responseItem = item;
+
+  if (responseItem.type === "message") {
+    // Use a more specific type assertion for the message content
+    const content = Array.isArray(responseItem.content)
+      ? responseItem.content
+          .filter((c) => typeof c === "object" && c.type === "input_text")
+          .map((c) =>
+            typeof c === "object" && "text" in c
+              ? (c["text"] as string) || ""
+              : "",
+          )
+          .join("")
+      : "";
+    return { role: responseItem.role, content };
+  } else if (responseItem.type === "function_call_output") {
     return {
       role: "tool",
-      tool_call_id: item.call_id,
-      content: item.output,
+      tool_call_id: responseItem.call_id,
+      content: responseItem.output,
     };
   }
-  throw new Error(
-    `Unsupported input item type: ${(item as ResponseInputItem).type}`,
-  );
+  throw new Error(`Unsupported input item type: ${responseItem.type}`);
 }
 
 // Function to get full messages including history
@@ -240,10 +251,10 @@ function convertTools(
   return tools
     ?.filter((tool) => tool.type === "function")
     .map((tool) => ({
-      type: "function",
+      type: "function" as const,
       function: {
         name: tool.name,
-        description: tool.description,
+        description: tool.description || undefined,
         parameters: tool.parameters,
       },
     }));
@@ -289,6 +300,9 @@ async function nonStreamResponses(
     web_search_options: webSearchOptions,
     temperature: input.temperature,
     top_p: input.top_p,
+    tool_choice: (input.tool_choice === "auto"
+      ? "auto"
+      : input.tool_choice) as OpenAI.Chat.Completions.ChatCompletionCreateParams["tool_choice"],
     store: input.store,
     user: input.user,
     metadata: input.metadata,
@@ -313,7 +327,7 @@ async function nonStreamResponses(
     const hasFunctionCalls =
       assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0;
 
-    if (hasFunctionCalls) {
+    if (hasFunctionCalls && assistantMessage.tool_calls) {
       for (const toolCall of assistantMessage.tool_calls) {
         if (toolCall.type === "function") {
           outputContent.push({
@@ -356,7 +370,7 @@ async function nonStreamResponses(
       ],
       parallel_tool_calls: input.parallel_tool_calls ?? false,
       previous_response_id: input.previous_response_id ?? null,
-      reasoning: { effort: null, summary: null },
+      reasoning: null,
       store: input.store ?? false,
       temperature: input.temperature ?? 1.0,
       text: { format: { type: "text" } },
@@ -372,14 +386,21 @@ async function nonStreamResponses(
             output_tokens_details: { reasoning_tokens: 0 },
             total_tokens: chatResponse.usage.total_tokens,
           }
-        : null,
-      user: input.user ?? null,
+        : undefined,
+      user: input.user ?? undefined,
       metadata: input.metadata ?? {},
+      output_text: "",
     } as ResponseOutput;
 
     // Add required_action property for tool calls
-    if (hasFunctionCalls) {
-      (responseOutput as Partial<ResponseOutput>).required_action = {
+    if (hasFunctionCalls && assistantMessage.tool_calls) {
+      // Define type with required action
+      type ResponseWithAction = Partial<ResponseOutput> & {
+        required_action: unknown;
+      };
+
+      // Use the defined type for the assertion
+      (responseOutput as ResponseWithAction).required_action = {
         type: "submit_tool_outputs",
         submit_tool_outputs: {
           tool_calls: assistantMessage.tool_calls.map((toolCall) => ({
@@ -416,7 +437,7 @@ async function* streamResponses(
   const fullMessages = getFullMessages(input);
   const chatTools = convertTools(input.tools);
   const webSearchOptions = input.tools?.some(
-    (tool) => tool.type === "builtin" && tool.name === "web_search",
+    (tool) => tool.type === "function" && tool.name === "web_search",
   )
     ? {}
     : undefined;
@@ -428,7 +449,9 @@ async function* streamResponses(
     web_search_options: webSearchOptions,
     temperature: input.temperature ?? 1.0,
     top_p: input.top_p ?? 1.0,
-    tool_choice: input.tool_choice ?? "auto",
+    tool_choice: (input.tool_choice === "auto"
+      ? "auto"
+      : input.tool_choice) as OpenAI.Chat.Completions.ChatCompletionCreateParams["tool_choice"],
     stream: true,
     store: input.store ?? false,
     user: input.user,
@@ -449,9 +472,9 @@ async function* streamResponses(
     // Initial response
     const initialResponse: Partial<ResponseOutput> = {
       id: responseId,
-      object: "response",
+      object: "response" as const,
       created_at: Math.floor(Date.now() / 1000),
-      status: "in_progress",
+      status: "in_progress" as const,
       model: input.model,
       output: [],
       error: null,
@@ -460,22 +483,22 @@ async function* streamResponses(
       max_output_tokens: null,
       parallel_tool_calls: true,
       previous_response_id: input.previous_response_id ?? null,
-      reasoning: { effort: null, summary: null },
-      store: input.store ?? false,
+      reasoning: null,
       temperature: input.temperature ?? 1.0,
       text: { format: { type: "text" } },
       tool_choice: input.tool_choice ?? "auto",
       tools: input.tools ?? [],
       top_p: input.top_p ?? 1.0,
       truncation: input.truncation ?? "disabled",
-      usage: null,
-      user: input.user ?? null,
+      usage: undefined,
+      user: input.user ?? undefined,
       metadata: input.metadata ?? {},
+      output_text: "",
     };
     yield { type: "response.created", response: initialResponse };
     yield { type: "response.in_progress", response: initialResponse };
     let isToolCall = false;
-    for await (const chunk of stream) {
+    for await (const chunk of stream as AsyncIterable<OpenAI.ChatCompletionChunk>) {
       // console.error('\nCHUNK: ', JSON.stringify(chunk));
       const choice = chunk.choices[0];
       if (!choice) {
@@ -489,7 +512,17 @@ async function* streamResponses(
         isToolCall = true;
       }
 
-      usage = chunk.usage;
+      if (chunk.usage) {
+        usage = {
+          prompt_tokens: chunk.usage.prompt_tokens,
+          completion_tokens: chunk.usage.completion_tokens,
+          total_tokens: chunk.usage.total_tokens,
+          input_tokens: chunk.usage.prompt_tokens,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens: chunk.usage.completion_tokens,
+          output_tokens_details: { reasoning_tokens: 0 },
+        };
+      }
       if (isToolCall) {
         for (const tcDelta of choice.delta.tool_calls || []) {
           const tcIndex = tcDelta.index;
@@ -546,15 +579,17 @@ async function* streamResponses(
             };
             yield {
               type: "response.function_call_arguments.done",
-              item,
+              item_id: outputItemId,
               output_index: tcIndex,
+              content_index: textContentAdded ? tcIndex + 1 : tcIndex,
+              arguments: tc.arguments,
             };
             yield {
               type: "response.output_item.done",
               output_index: tcIndex,
               item,
             };
-            finalOutputItem.push(item);
+            finalOutputItem.push(item as unknown as ResponseContentOutput);
           }
         } else {
           continue;
@@ -608,7 +643,7 @@ async function* streamResponses(
             output_index: 0,
             item,
           };
-          finalOutputItem.push(item);
+          finalOutputItem.push(item as unknown as ResponseContentOutput);
         } else {
           continue;
         }
@@ -617,43 +652,60 @@ async function* streamResponses(
       // Construct final response
       const finalResponse: ResponseOutput = {
         id: responseId,
-        object: "response",
-        created_at: initialResponse.created_at,
-        status: "completed",
+        object: "response" as const,
+        created_at: initialResponse.created_at || Math.floor(Date.now() / 1000),
+        status: "completed" as const,
         error: null,
         incomplete_details: null,
         instructions: null,
         max_output_tokens: null,
         model: chunk.model || input.model,
-        output: finalOutputItem,
+        output: finalOutputItem as unknown as ResponseOutput["output"],
         parallel_tool_calls: true,
         previous_response_id: input.previous_response_id ?? null,
-        reasoning: { effort: null, summary: null },
-        store: input.store ?? false,
+        reasoning: null,
         temperature: input.temperature ?? 1.0,
         text: { format: { type: "text" } },
         tool_choice: input.tool_choice ?? "auto",
         tools: input.tools ?? [],
         top_p: input.top_p ?? 1.0,
         truncation: input.truncation ?? "disabled",
-        usage,
-        user: input.user ?? null,
+        usage: usage as ResponseOutput["usage"],
+        user: input.user ?? undefined,
         metadata: input.metadata ?? {},
-      };
+        output_text: "",
+      } as ResponseOutput;
 
       // Store history
       const assistantMessage = {
         role: "assistant" as const,
         content: textContent || null,
       };
+
+      // Add tool_calls property if needed
       if (toolCalls.size > 0) {
-        assistantMessage.tool_calls = Array.from(
-          toolCalls.values().map((tc) => ({
-            id: tc.id,
-            type: "function" as const,
-            function: { name: tc.name, arguments: tc.arguments },
-          })),
-        );
+        const toolCallsArray = Array.from(toolCalls.values()).map((tc) => ({
+          id: tc.id,
+          type: "function" as const,
+          function: { name: tc.name, arguments: tc.arguments },
+        }));
+
+        // Define a more specific type for the assistant message with tool calls
+        type AssistantMessageWithToolCalls =
+          OpenAI.Chat.Completions.ChatCompletionMessageParam & {
+            tool_calls: Array<{
+              id: string;
+              type: "function";
+              function: {
+                name: string;
+                arguments: string;
+              };
+            }>;
+          };
+
+        // Use type assertion with the defined type
+        (assistantMessage as AssistantMessageWithToolCalls).tool_calls =
+          toolCallsArray;
       }
       const newHistory = [...fullMessages, assistantMessage];
       conversationHistories.set(responseId, {
