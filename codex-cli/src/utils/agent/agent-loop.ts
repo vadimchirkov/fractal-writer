@@ -5,6 +5,7 @@ import type {
   ResponseFunctionToolCall,
   ResponseInputItem,
   ResponseItem,
+  ResponseCreateParams,
 } from "openai/resources/responses/responses.mjs";
 import type { Reasoning } from "openai/resources.mjs";
 
@@ -521,8 +522,18 @@ export class AgentLoop {
               );
             }
 
+            const responseCall =
+              !this.config.provider ||
+              this.config.provider?.toLowerCase() === "openai"
+                ? (params: ResponseCreateParams) =>
+                    this.oai.responses.create(params)
+                : (params: ResponseCreateParams) =>
+                    responsesCreateViaChatCompletions(
+                      this.oai,
+                      params as ResponseCreateParams & { stream: true },
+                    );
             // eslint-disable-next-line no-await-in-loop
-            stream = await responsesCreateViaChatCompletions(this.oai, {
+            stream = await responseCall({
               model: this.model,
               instructions: mergedInstructions,
               previous_response_id: lastResponseId || undefined,

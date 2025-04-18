@@ -208,7 +208,7 @@ async function nonStreamResponses(
   const fullMessages = getFullMessages(input);
   const chatTools = convertTools(input.tools);
   const webSearchOptions = input.tools?.some(
-    (tool) => tool.type === "builtin" && tool.name === "web_search",
+    (tool) => tool.type === "function" && tool.name === "web_search",
   )
     ? {}
     : undefined;
@@ -220,7 +220,6 @@ async function nonStreamResponses(
     web_search_options: webSearchOptions,
     temperature: input.temperature,
     top_p: input.top_p,
-    stream: false,
     store: input.store,
     user: input.user,
     metadata: input.metadata,
@@ -240,16 +239,24 @@ async function nonStreamResponses(
     const responseId = generateId("resp");
     const outputItemId = generateId("msg");
     const outputContent: Array<any> = [];
-    if (assistantMessage.tool_calls) {
-      outputContent.push(
-        ...assistantMessage.tool_calls.map((toolCall) => ({
-          type: "function_call",
-          call_id: toolCall.id,
-          name: toolCall.function.name,
-          arguments: toolCall.function.arguments,
-        })),
-      );
+
+    // Check if the response contains tool calls
+    const hasFunctionCalls =
+      assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0;
+
+    if (hasFunctionCalls) {
+      for (const toolCall of assistantMessage.tool_calls) {
+        if (toolCall.type === "function") {
+          outputContent.push({
+            type: "function_call",
+            call_id: toolCall.id,
+            name: toolCall.function.name,
+            arguments: toolCall.function.arguments,
+          });
+        }
+      }
     }
+
     if (assistantMessage.content) {
       outputContent.push({
         type: "output_text",
@@ -257,11 +264,13 @@ async function nonStreamResponses(
         annotations: [],
       });
     }
-    const responseOutput: ResponseOutput = {
+
+    // Create response with appropriate status and properties
+    const responseOutput = {
       id: responseId,
       object: "response",
       created_at: Math.floor(Date.now() / 1000),
-      status: "completed",
+      status: hasFunctionCalls ? "requires_action" : "completed",
       error: null,
       incomplete_details: null,
       instructions: null,
@@ -297,7 +306,24 @@ async function nonStreamResponses(
         : null,
       user: input.user ?? null,
       metadata: input.metadata ?? {},
-    };
+    } as ResponseOutput;
+
+    // Add required_action property for tool calls
+    if (hasFunctionCalls) {
+      (responseOutput as any).required_action = {
+        type: "submit_tool_outputs",
+        submit_tool_outputs: {
+          tool_calls: assistantMessage.tool_calls.map((toolCall) => ({
+            id: toolCall.id,
+            type: toolCall.type,
+            function: {
+              name: toolCall.function.name,
+              arguments: toolCall.function.arguments,
+            },
+          })),
+        },
+      };
+    }
 
     // Store history
     const newHistory = [...fullMessages, assistantMessage];

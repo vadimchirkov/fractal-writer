@@ -396,7 +396,8 @@ export const saveConfig = (
   const ext = extname(targetPath).toLowerCase();
   // Create the config object to save
   const configToSave: StoredConfig = {
-    model: config.model, provider: config.provider
+    model: config.model,
+    provider: config.provider,
   };
 
   // Add history settings if they exist
