@@ -285,7 +285,7 @@ describe("responsesCreateViaChatCompletions", () => {
 
       // Verify OpenAI was called with correct parameters
       expect(openAiState.createSpy).toHaveBeenCalledTimes(1);
-      
+
       // Skip type checking for mock objects in tests - this is acceptable for test code
       // @ts-ignore
       const callArgs = openAiState.createSpy?.mock?.calls?.[0]?.[0];
@@ -385,7 +385,7 @@ describe("responsesCreateViaChatCompletions", () => {
 
       // Verify OpenAI was called with correct parameters
       expect(openAiState.createSpy).toHaveBeenCalledTimes(1);
-      
+
       // Skip type checking for mock objects in tests
       // @ts-ignore
       const callArgs = openAiState.createSpy?.mock?.calls?.[0]?.[0];
@@ -409,7 +409,9 @@ describe("responsesCreateViaChatCompletions", () => {
         if (isFunctionCall(content)) {
           // These properties should exist on ResponseFunctionToolCall
           expect((content as any).name).toBe("get_weather");
-          expect(JSON.parse((content as any).arguments).location).toBe("New York");
+          expect(JSON.parse((content as any).arguments).location).toBe(
+            "New York",
+          );
         }
       }
     });
@@ -483,7 +485,7 @@ describe("responsesCreateViaChatCompletions", () => {
 
       // Verify history was included in second call
       expect(openAiState.createSpy).toHaveBeenCalledTimes(1);
-      
+
       // Skip type checking for mock objects in tests
       // @ts-ignore
       const secondCallArgs = openAiState.createSpy?.mock?.calls?.[0]?.[0];
@@ -566,10 +568,12 @@ describe("responsesCreateViaChatCompletions", () => {
 
       // Cast result to include required_action to address TypeScript issues
       const resultWithAction = result as any;
-      
+
       // Add null checks for required_action
       expect(resultWithAction.required_action).not.toBeNull();
-      expect(resultWithAction.required_action?.type).toBe("submit_tool_outputs");
+      expect(resultWithAction.required_action?.type).toBe(
+        "submit_tool_outputs",
+      );
 
       // Safely access the tool calls with proper null checks
       const toolCalls =

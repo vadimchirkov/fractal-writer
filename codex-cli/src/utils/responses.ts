@@ -53,7 +53,7 @@ type ResponseOutput = Response;
 //   metadata: Record<string, string>;
 // }
 
-// Define types for the ResponseItem content and parts 
+// Define types for the ResponseItem content and parts
 type ResponseContentPart = {
   type: string;
   [key: string]: unknown;
@@ -71,7 +71,11 @@ type ResponseItemType = {
 type ResponseEvent =
   | { type: "response.created"; response: Partial<ResponseOutput> }
   | { type: "response.in_progress"; response: Partial<ResponseOutput> }
-  | { type: "response.output_item.added"; output_index: number; item: ResponseItemType }
+  | {
+      type: "response.output_item.added";
+      output_index: number;
+      item: ResponseItemType;
+    }
   | {
       type: "response.content_part.added";
       item_id: string;
@@ -114,7 +118,11 @@ type ResponseEvent =
       content_index: number;
       part: ResponseContentPart;
     }
-  | { type: "response.output_item.done"; output_index: number; item: ResponseItemType }
+  | {
+      type: "response.output_item.done";
+      output_index: number;
+      item: ResponseItemType;
+    }
   | { type: "response.completed"; response: ResponseOutput }
   | { type: "error"; code: string; message: string; param: string | null };
 
@@ -134,7 +142,7 @@ type UsageData = {
 };
 
 // Define a type for content output
-type ResponseContentOutput = 
+type ResponseContentOutput =
   | {
       type: "function_call";
       call_id: string;
@@ -170,8 +178,8 @@ function convertInputItemToMessage(
   item: string | ResponseInputItem,
 ): OpenAI.Chat.Completions.ChatCompletionMessageParam {
   // Handle string inputs as content for a user message
-  if (typeof item === 'string') {
-    return { role: 'user', content: item };
+  if (typeof item === "string") {
+    return { role: "user", content: item };
   }
 
   // Handle object items
@@ -188,28 +196,32 @@ function convertInputItemToMessage(
       content: item.output,
     };
   }
-  throw new Error(`Unsupported input item type: ${(item as ResponseInputItem).type}`);
+  throw new Error(
+    `Unsupported input item type: ${(item as ResponseInputItem).type}`,
+  );
 }
 
 // Function to get full messages including history
 function getFullMessages(
   input: ResponseCreateInput,
 ): Array<OpenAI.Chat.Completions.ChatCompletionMessageParam> {
-  let baseHistory: Array<OpenAI.Chat.Completions.ChatCompletionMessageParam> = [];
+  let baseHistory: Array<OpenAI.Chat.Completions.ChatCompletionMessageParam> =
+    [];
   if (input.previous_response_id) {
     const prev = conversationHistories.get(input.previous_response_id);
-    if (!prev)
-      {throw new Error(
+    if (!prev) {
+      throw new Error(
         `Previous response not found: ${input.previous_response_id}`,
-      );}
+      );
+    }
     baseHistory = prev.messages;
   }
-  
+
   // Handle both string and ResponseInputItem in input.input
-  const newInputMessages = Array.isArray(input.input) 
-    ? input.input.map(convertInputItemToMessage) 
+  const newInputMessages = Array.isArray(input.input)
+    ? input.input.map(convertInputItemToMessage)
     : [convertInputItemToMessage(input.input)];
-    
+
   const messages = [...baseHistory, ...newInputMessages];
   if (
     input.instructions &&
@@ -466,7 +478,9 @@ async function* streamResponses(
     for await (const chunk of stream) {
       // console.error('\nCHUNK: ', JSON.stringify(chunk));
       const choice = chunk.choices[0];
-      if (!choice) {continue;}
+      if (!choice) {
+        continue;
+      }
       if (
         !isToolCall &&
         (("tool_calls" in choice.delta && choice.delta.tool_calls) ||
@@ -652,7 +666,10 @@ async function* streamResponses(
   } catch (error) {
     yield {
       type: "error",
-      code: error instanceof Error && "code" in error ? (error as { code: string }).code : "unknown",
+      code:
+        error instanceof Error && "code" in error
+          ? (error as { code: string }).code
+          : "unknown",
       message: error instanceof Error ? error.message : String(error),
       param: null,
     };

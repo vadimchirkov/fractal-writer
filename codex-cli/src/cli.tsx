@@ -24,9 +24,7 @@ import {
   INSTRUCTIONS_FILEPATH,
 } from "./utils/config";
 import { createInputItem } from "./utils/input-utils";
-import {
-  isModelSupportedForResponses,
-} from "./utils/model-utils.js";
+import { isModelSupportedForResponses } from "./utils/model-utils.js";
 import { parseToolCall } from "./utils/parsers";
 import { onExit, setInkRenderer } from "./utils/terminal";
 import chalk from "chalk";
