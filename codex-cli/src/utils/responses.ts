@@ -303,7 +303,6 @@ async function nonStreamResponses(
     tool_choice: (input.tool_choice === "auto"
       ? "auto"
       : input.tool_choice) as OpenAI.Chat.Completions.ChatCompletionCreateParams["tool_choice"],
-    store: input.store,
     user: input.user,
     metadata: input.metadata,
   };
@@ -371,7 +370,6 @@ async function nonStreamResponses(
       parallel_tool_calls: input.parallel_tool_calls ?? false,
       previous_response_id: input.previous_response_id ?? null,
       reasoning: null,
-      store: input.store ?? false,
       temperature: input.temperature ?? 1.0,
       text: { format: { type: "text" } },
       tool_choice: input.tool_choice ?? "auto",
@@ -453,12 +451,12 @@ async function* streamResponses(
       ? "auto"
       : input.tool_choice) as OpenAI.Chat.Completions.ChatCompletionCreateParams["tool_choice"],
     stream: true,
-    store: input.store ?? false,
     user: input.user,
     metadata: input.metadata,
   };
 
   try {
+    // console.error("chatInput", JSON.stringify(chatInput));
     const stream = await openai.chat.completions.create(chatInput);
 
     // Initialize state
@@ -604,7 +602,8 @@ async function* streamResponses(
             part: { type: "output_text", text: "", annotations: [] },
           };
           textContentAdded = true;
-        } else if (choice.delta.content) {
+        }
+        if (choice.delta.content?.length) {
           yield {
             type: "response.output_text.delta",
             item_id: outputItemId,
@@ -716,6 +715,7 @@ async function* streamResponses(
       yield { type: "response.completed", response: finalResponse };
     }
   } catch (error) {
+    // console.error('\nERROR: ', JSON.stringify(error));
     yield {
       type: "error",
       code:
