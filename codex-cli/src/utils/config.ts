@@ -52,6 +52,9 @@ export function getBaseUrl(provider: string = "openai"): string | undefined {
 export function getApiKey(provider: string = "openai"): string | undefined {
   const providerInfo = providers[provider.toLowerCase()];
   if (providerInfo) {
+    if (providerInfo.name === "Ollama") {
+      return process.env[providerInfo.envKey] ?? "dummy";
+    }
     return process.env[providerInfo.envKey];
   }
 
