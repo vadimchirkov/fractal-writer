@@ -1,11 +1,11 @@
 import TypeaheadOverlay from "./typeahead-overlay.js";
 import {
   getAvailableModels,
-  RECOMMENDED_MODELS,
+  RECOMMENDED_MODELS as _RECOMMENDED_MODELS,
 } from "../utils/model-utils.js";
+import { providers } from "../utils/providers.js";
 import { Box, Text, useInput } from "ink";
 import React, { useEffect, useState } from "react";
-import { providers } from "../utils/providers.js";
 
 /**
  * Props for <ModelOverlay>.
@@ -35,7 +35,7 @@ export default function ModelOverlay({
   const [items, setItems] = useState<Array<{ label: string; value: string }>>(
     [],
   );
-  const [providerItems, setProviderItems] = useState<
+  const [providerItems, _setProviderItems] = useState<
     Array<{ label: string; value: string }>
   >(Object.values(providers).map((p) => ({ label: p.name, value: p.name })));
   const [mode, setMode] = useState<"model" | "provider">("model");
@@ -55,7 +55,8 @@ export default function ModelOverlay({
           })),
         );
       } catch (error) {
-        console.error("Error loading models:", error);
+        // Silently handle errors - remove console.error
+        // console.error("Error loading models:", error);
       } finally {
         setIsLoading(false);
       }

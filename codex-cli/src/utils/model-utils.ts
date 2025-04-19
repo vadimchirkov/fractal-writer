@@ -25,7 +25,12 @@ async function fetchModels(provider: string): Promise<Array<string>> {
     const models: Array<string> = [];
     for await (const model of list as AsyncIterable<{ id?: string }>) {
       if (model && typeof model.id === "string") {
-        models.push(model.id);
+        let modelStr = model.id;
+        // fix for gemini
+        if (modelStr.startsWith("models/")) {
+          modelStr = modelStr.replace("models/", "");
+        }
+        models.push(modelStr);
       }
     }
 
@@ -59,7 +64,7 @@ export async function isModelSupportedForResponses(
 
   try {
     const models = await Promise.race<Array<string>>([
-      getAvailableModels(),
+      getAvailableModels("openai"),
       new Promise<Array<string>>((resolve) =>
         setTimeout(() => resolve([]), MODEL_LIST_TIMEOUT_MS),
       ),

@@ -1,21 +1,19 @@
 import type { ReviewDecision } from "./review.js";
 import type { ApplyPatchCommand, ApprovalPolicy } from "../../approvals.js";
 import type { AppConfig } from "../config.js";
+import type { ResponseEvent } from "../responses.js";
 import type {
   ResponseFunctionToolCall,
   ResponseInputItem,
   ResponseItem,
+  ResponseCreateParams,
 } from "openai/resources/responses/responses.mjs";
 import type { Reasoning } from "openai/resources.mjs";
 
 import { log, isLoggingEnabled } from "./log.js";
-import {
-  OPENAI_BASE_URL,
-  OPENAI_TIMEOUT_MS,
-  getApiKey,
-  getBaseUrl,
-} from "../config.js";
+import { OPENAI_TIMEOUT_MS, getApiKey, getBaseUrl } from "../config.js";
 import { parseToolCallArguments } from "../parsers.js";
+import { responsesCreateViaChatCompletions } from "../responses.js";
 import {
   ORIGIN,
   CLI_VERSION,
@@ -26,7 +24,6 @@ import {
 import { handleExecCommand } from "./handle-exec-command.js";
 import { randomUUID } from "node:crypto";
 import OpenAI, { APIConnectionTimeoutError } from "openai";
-import { responsesCreateViaChatCompletions } from "../responses.js";
 
 // Wait time before retrying after rate limit errors (ms).
 const RATE_LIMIT_RETRY_WAIT_MS = parseInt(
@@ -38,6 +35,7 @@ export type CommandConfirmation = {
   review: ReviewDecision;
   applyPatch?: ApplyPatchCommand | undefined;
   customDenyMessage?: string;
+  explanation?: string;
 };
 
 const alreadyProcessedResponses = new Set();
@@ -50,6 +48,9 @@ type AgentLoopParams = {
   approvalPolicy: ApprovalPolicy;
   onItem: (item: ResponseItem) => void;
   onLoading: (loading: boolean) => void;
+
+  /** Extra writable roots to use with sandbox execution. */
+  additionalWritableRoots: ReadonlyArray<string>;
 
   /** Called when the command is not auto-approved to request explicit user review. */
   getCommandConfirmation: (
@@ -65,6 +66,7 @@ export class AgentLoop {
   private instructions?: string;
   private approvalPolicy: ApprovalPolicy;
   private config: AppConfig;
+  private additionalWritableRoots: ReadonlyArray<string>;
 
   // Using `InstanceType<typeof OpenAI>` sidesteps typing issues with the OpenAI package under
   // the TS 5+ `moduleResolution=bundler` setup. OpenAI client instance. We keep the concrete
@@ -221,6 +223,7 @@ export class AgentLoop {
     onLoading,
     getCommandConfirmation,
     onLastResponseId,
+    additionalWritableRoots,
   }: AgentLoopParams & { config?: AppConfig }) {
     this.model = model;
     this.provider = provider;
@@ -238,6 +241,7 @@ export class AgentLoop {
         model,
         instructions: instructions ?? "",
       } as AppConfig);
+    this.additionalWritableRoots = additionalWritableRoots;
     this.onItem = onItem;
     this.onLoading = onLoading;
     this.getCommandConfirmation = getCommandConfirmation;
@@ -369,6 +373,7 @@ export class AgentLoop {
         args,
         this.config,
         this.approvalPolicy,
+        this.additionalWritableRoots,
         this.getCommandConfirmation,
         this.execAbortController?.signal,
       );
@@ -500,7 +505,6 @@ export class AgentLoop {
             if (this.model.startsWith("o")) {
               reasoning = { effort: "high" };
               if (this.model === "o3" || this.model === "o4-mini") {
-                // @ts-expect-error waiting for API type update
                 reasoning.summary = "auto";
               }
             }
@@ -513,8 +517,18 @@ export class AgentLoop {
               );
             }
 
+            const responseCall =
+              !this.config.provider ||
+              this.config.provider?.toLowerCase() === "openai"
+                ? (params: ResponseCreateParams) =>
+                    this.oai.responses.create(params)
+                : (params: ResponseCreateParams) =>
+                    responsesCreateViaChatCompletions(
+                      this.oai,
+                      params as ResponseCreateParams & { stream: true },
+                    );
             // eslint-disable-next-line no-await-in-loop
-            stream = await responsesCreateViaChatCompletions(this.oai, {
+            stream = await responseCall({
               model: this.model,
               instructions: mergedInstructions,
               previous_response_id: lastResponseId || undefined,
@@ -612,7 +626,7 @@ export class AgentLoop {
 
                 // Parse suggested retry time from error message, e.g., "Please try again in 1.3s"
                 const msg = errCtx?.message ?? "";
-                const m = /retry again in ([\d.]+)s/i.exec(msg);
+                const m = /(?:retry|try) again in ([\d.]+)s/i.exec(msg);
                 if (m && m[1]) {
                   const suggested = parseFloat(m[1]) * 1000;
                   if (!Number.isNaN(suggested)) {
@@ -737,7 +751,7 @@ export class AgentLoop {
 
         try {
           // eslint-disable-next-line no-await-in-loop
-          for await (const event of stream) {
+          for await (const event of stream as AsyncIterable<ResponseEvent>) {
             // console.error('RESPONSE', JSON.stringify(event));
             if (isLoggingEnabled()) {
               log(`AgentLoop.run(): response event ${event.type}`);
